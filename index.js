@@ -58,7 +58,7 @@ client.on('message', async (message) => {
   // Se detectar palavra-chave, aciona webhook do n8n (ou outro)
   if (temPalavraChave(msg)) {
     try {
-      await axios.post('https://n8n-n8n-start.bnjgif.easypanel.host/webhook-test/ALERTA-IMEDIATO', {
+      await axios.post('https://n8n-n8n-start.bnjgif.easypanel.host/webhook/9aaa085a-c69f-4b6c-ab4f-e54e28144b98', {
         group_id,
         group_name,
         message: msg,
