@@ -88,7 +88,8 @@ app.post('/send-report', async (req, res) => {
   const { message } = req.body;
 
   try {
-    await client.sendMessage(reportGroupId, message);
+    const groupChat = await client.getChatById(reportGroupId);
+    await groupChat.sendMessage(message);
     console.log('📤 Relatório enviado ao grupo MNNO | REPORTS');
     res.status(200).send('Mensagem enviada com sucesso');
   } catch (error) {
