@@ -2,6 +2,8 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
+const express = require('express');
+const bodyParser = require('body-parser');
 
 // Conectar ao Supabase
 const supabase = createClient(
@@ -11,6 +13,9 @@ const supabase = createClient(
 
 // Palavras-chave para alerta imediato
 const palavrasChave = ['urgente', 'problema', 'rápido'];
+
+// ID fixo do grupo MNNO | REPORTS
+const reportGroupId = '120363418457382566@g.us';
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -73,6 +78,28 @@ client.on('message', async (message) => {
   } catch (error) {
     console.error('❌ Erro ao processar a mensagem:', error.message);
   }
+});
+
+// Servidor HTTP para receber relatórios
+const app = express();
+app.use(bodyParser.json());
+
+app.post('/send-report', async (req, res) => {
+  const { message } = req.body;
+
+  try {
+    await client.sendMessage(reportGroupId, message);
+    console.log('📤 Relatório enviado ao grupo MNNO | REPORTS');
+    res.status(200).send('Mensagem enviada com sucesso');
+  } catch (error) {
+    console.error('❌ Erro ao enviar relatório:', error.message);
+    res.status(500).send('Erro ao enviar mensagem');
+  }
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`🚀 Servidor HTTP escutando na porta ${PORT}`);
 });
 
 client.initialize();
