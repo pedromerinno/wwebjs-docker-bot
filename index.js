@@ -1,18 +1,16 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode');
+const qrcode = require('qrcode-terminal');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 
 // Conectar ao Supabase
 const supabase = createClient(
-  'https://wockxqovlynbupcxtmgt.supabase.co',      // Substituir pela URL do seu Supabase
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvY2t4cW92bHluYnVwY3h0bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1MjU2MjEsImV4cCI6MjA2NDEwMTYyMX0.4VfVsoevKfD66Rv4qvosYIdJYWBOEJZ-0Um0JgE8WwA'                       // Substituir pela ANON KEY do seu Supabase
+  'https://wockxqovlynbupcxtmgt.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvY2t4cW92bHluYnVwY3h0bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1MjU2MjEsImV4cCI6MjA2NDEwMTYyMX0.4VfVsoevKfD66Rv4qvosYIdJYWBOEJZ-0Um0JgE8WwA'
 );
 
 // Palavras-chave para alerta imediato
-const palavrasChave = ['urgente', 'rápido', 'problema'];
-const temPalavraChave = (texto) =>
-  palavrasChave.some(p => texto.toLowerCase().includes(p));
+const palavrasChave = ['urgente', 'problema', 'rápido'];
 
 const client = new Client({
   authStrategy: new LocalAuth(),
@@ -21,55 +19,62 @@ const client = new Client({
   }
 });
 
-client.on('qr', async (qr) => {
-  const qrImage = await qrcode.toString(qr, { type: 'terminal' });
-  console.log(qrImage);
+client.on('qr', (qr) => {
+  qrcode.generate(qr, { small: true });
   console.log('✅ Escaneie o QR Code com o WhatsApp Web!');
 });
 
-client.on('ready', () => {
+client.on('ready', async () => {
   console.log('✅ Bot conectado ao WhatsApp!');
+
+  // Mostrar grupos e IDs
+  const chats = await client.getChats();
+  const groups = chats.filter(chat => chat.isGroup);
+  console.log('\n📋 Grupos encontrados:');
+  groups.forEach(group => {
+    console.log(`• ${group.name} => ${group.id._serialized}`);
+  });
 });
 
 client.on('message', async (message) => {
-  const chat = await message.getChat();
-  if (!chat.isGroup) return;
+  try {
+    const chat = await message.getChat();
 
-  const { id: group_id, name: group_name } = chat;
-  const { body: msg, timestamp, author: sender_id } = message;
-  const sender_contact = await message.getContact();
-  const sender_name = sender_contact?.pushname || sender_contact?.name || 'Desconhecido';
+    // Ignorar mensagens que não são de grupo
+    if (!chat.isGroup) return;
 
-  const { error } = await supabase.from('group_messages').insert({
-    group_id,
-    group_name,
-    message: msg,
-    timestamp: new Date(timestamp * 1000),
-    sender_id,
-    sender_name
-  });
+    const groupId = chat.id._serialized;
+    const groupName = chat.name;
+    const sender = await message.getContact();
 
-  if (error) {
-    console.error('❌ Erro ao salvar no Supabase:', error);
-  } else {
-    console.log(`[${group_name}] ${sender_name}: ${msg}`);
-  }
+    const messageText = message.body || '';
 
-  // Se detectar palavra-chave, aciona webhook do n8n (ou outro)
-  if (temPalavraChave(msg)) {
-    try {
-      await axios.post('https://n8n-n8n-start.bnjgif.easypanel.host/webhook/9aaa085a-c69f-4b6c-ab4f-e54e28144b98', {
-        group_id,
-        group_name,
-        message: msg,
-        timestamp: new Date(timestamp * 1000),
-        sender_id,
-        sender_name
+    // Salvar no Supabase
+    await supabase.from('group_messages').insert([{
+      group_id: groupId,
+      group_name: groupName,
+      message: messageText,
+      timestamp: new Date().toISOString(),
+      sender_name: sender.pushname || sender.name || 'Desconhecido',
+      sender_id: sender.id._serialized
+    }]);
+
+    console.log(`[${groupName}] ${sender.pushname || sender.name}: ${messageText}`);
+
+    // Se contiver palavras-chave, dispara alerta via n8n (opcional)
+    const textoMinusculo = messageText.toLowerCase();
+    const alertaDetectado = palavrasChave.some(palavra => textoMinusculo.includes(palavra));
+
+    if (alertaDetectado) {
+      await axios.post('https://n8n-n8n-start.bnjgif.easypanel.host/webhook-test/111dcbfa-b218-4c49-a3c7-e3ac32bf83bf', {
+        group_name: groupName,
+        sender: sender.pushname || sender.name,
+        message: messageText
       });
-      console.log('⚠️ Palavra-chave detectada e alerta enviado.');
-    } catch (err) {
-      console.error('Erro ao enviar alerta para n8n:', err.message);
+      console.log('🚨 Alerta enviado ao n8n');
     }
+  } catch (error) {
+    console.error('❌ Erro ao processar a mensagem:', error.message);
   }
 });
 
