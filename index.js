@@ -1,42 +1,76 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
+const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 
+// Conectar ao Supabase
+const supabase = createClient(
+  'https://<SEU-PROJETO>.supabase.co',      // Substituir pela URL do seu Supabase
+  'SUPABASE_ANON_KEY'                       // Substituir pela ANON KEY do seu Supabase
+);
+
+// Palavras-chave para alerta imediato
+const palavrasChave = ['urgente', 'rápido', 'problema'];
+const temPalavraChave = (texto) =>
+  palavrasChave.some(p => texto.toLowerCase().includes(p));
+
 const client = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: {
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
-    }
+  authStrategy: new LocalAuth(),
+  puppeteer: {
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  }
 });
 
 client.on('qr', async (qr) => {
-    try {
-        const qrImage = await qrcode.toString(qr, { type: 'terminal' });
-        console.log(qrImage);
-        console.log('✅ Escaneie o QR Code com o WhatsApp Web!');
-    } catch (err) {
-        console.error('Erro ao gerar QR Code:', err);
-    }
+  const qrImage = await qrcode.toString(qr, { type: 'terminal' });
+  console.log(qrImage);
+  console.log('✅ Escaneie o QR Code com o WhatsApp Web!');
 });
 
 client.on('ready', () => {
-    console.log('✅ Bot conectado ao WhatsApp!');
+  console.log('✅ Bot conectado ao WhatsApp!');
 });
 
 client.on('message', async (message) => {
-    // Envia somente mensagens de grupos (que contêm "-")
-    if (!message.from.includes('-')) return;
+  const chat = await message.getChat();
+  if (!chat.isGroup) return;
 
+  const { id: group_id, name: group_name } = chat;
+  const { body: msg, timestamp, author: sender_id } = message;
+  const sender_contact = await message.getContact();
+  const sender_name = sender_contact?.pushname || sender_contact?.name || 'Desconhecido';
+
+  const { error } = await supabase.from('group_messages').insert({
+    group_id,
+    group_name,
+    message: msg,
+    timestamp: new Date(timestamp * 1000),
+    sender_id,
+    sender_name
+  });
+
+  if (error) {
+    console.error('❌ Erro ao salvar no Supabase:', error);
+  } else {
+    console.log(`[${group_name}] ${sender_name}: ${msg}`);
+  }
+
+  // Se detectar palavra-chave, aciona webhook do n8n (ou outro)
+  if (temPalavraChave(msg)) {
     try {
-        await axios.post('https://n8n-n8n-start.bnjgif.easypanel.host/webhook-test/111dcbfa-b218-4c49-a3c7-e3ac32bf83bf', {
-            from: message.from,
-            body: message.body,
-            timestamp: message.timestamp
-        });
-        console.log(`📤 Mensagem enviada do grupo ${message.from}`);
+      await axios.post('https://n8n-n8n-start.bnjgif.easypanel.host/webhook-test/ALERTA-IMEDIATO', {
+        group_id,
+        group_name,
+        message: msg,
+        timestamp: new Date(timestamp * 1000),
+        sender_id,
+        sender_name
+      });
+      console.log('⚠️ Palavra-chave detectada e alerta enviado.');
     } catch (err) {
-        console.error('Erro ao enviar para o n8n:', err.message);
+      console.error('Erro ao enviar alerta para n8n:', err.message);
     }
+  }
 });
 
 client.initialize();
