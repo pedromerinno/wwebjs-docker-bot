@@ -22,5 +22,3 @@ client.on('message', message => {
 });
 
 client.initialize();
-
-fix: add --no-sandbox flag to puppeteer
