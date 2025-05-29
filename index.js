@@ -5,8 +5,8 @@ const axios = require('axios');
 
 // Conectar ao Supabase
 const supabase = createClient(
-  'https://<SEU-PROJETO>.supabase.co',      // Substituir pela URL do seu Supabase
-  'SUPABASE_ANON_KEY'                       // Substituir pela ANON KEY do seu Supabase
+  'https://wockxqovlynbupcxtmgt.supabase.co',      // Substituir pela URL do seu Supabase
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndvY2t4cW92bHluYnVwY3h0bWd0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDg1MjU2MjEsImV4cCI6MjA2NDEwMTYyMX0.4VfVsoevKfD66Rv4qvosYIdJYWBOEJZ-0Um0JgE8WwA'                       // Substituir pela ANON KEY do seu Supabase
 );
 
 // Palavras-chave para alerta imediato
