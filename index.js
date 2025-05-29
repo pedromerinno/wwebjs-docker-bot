@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 const { createClient } = require('@supabase/supabase-js');
 const axios = require('axios');
 
@@ -19,15 +19,15 @@ const client = new Client({
   }
 });
 
-client.on('qr', (qr) => {
-  qrcode.generate(qr, { small: true });
+client.on('qr', async (qr) => {
+  const qrCodeUrl = await qrcode.toString(qr, { type: 'terminal' });
+  console.log(qrCodeUrl);
   console.log('✅ Escaneie o QR Code com o WhatsApp Web!');
 });
 
 client.on('ready', async () => {
   console.log('✅ Bot conectado ao WhatsApp!');
 
-  // Mostrar grupos e IDs
   const chats = await client.getChats();
   const groups = chats.filter(chat => chat.isGroup);
   console.log('\n📋 Grupos encontrados:');
@@ -39,14 +39,11 @@ client.on('ready', async () => {
 client.on('message', async (message) => {
   try {
     const chat = await message.getChat();
-
-    // Ignorar mensagens que não são de grupo
     if (!chat.isGroup) return;
 
     const groupId = chat.id._serialized;
     const groupName = chat.name;
     const sender = await message.getContact();
-
     const messageText = message.body || '';
 
     // Salvar no Supabase
@@ -61,7 +58,7 @@ client.on('message', async (message) => {
 
     console.log(`[${groupName}] ${sender.pushname || sender.name}: ${messageText}`);
 
-    // Se contiver palavras-chave, dispara alerta via n8n (opcional)
+    // Alerta de palavra-chave
     const textoMinusculo = messageText.toLowerCase();
     const alertaDetectado = palavrasChave.some(palavra => textoMinusculo.includes(palavra));
 
