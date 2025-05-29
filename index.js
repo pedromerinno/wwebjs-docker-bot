@@ -1,5 +1,5 @@
 const { Client, LocalAuth } = require('whatsapp-web.js');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 
 const client = new Client({
     authStrategy: new LocalAuth(),
@@ -8,9 +8,14 @@ const client = new Client({
     }
 });
 
-client.on('qr', (qr) => {
-    qrcode.generate(qr, { small: true });
-    console.log('✅ Escaneie o QR Code com o WhatsApp Web!');
+client.on('qr', async (qr) => {
+    try {
+        const qrImage = await qrcode.toString(qr, { type: 'terminal' });
+        console.log(qrImage);
+        console.log('✅ Escaneie o QR Code com o WhatsApp Web!');
+    } catch (err) {
+        console.error('Erro ao gerar QR Code:', err);
+    }
 });
 
 client.on('ready', () => {
